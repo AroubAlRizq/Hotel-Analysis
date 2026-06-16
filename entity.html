@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Hajj 1447 — Entity & Country Price Dashboard</title>
+<style>
+  :root{
+    --bg:#0e1217; --panel:#171c24; --edge:#252c37; --ink:#e6edf3;
+    --muted:#8b97a6; --line:#2a3340; --gcc:#3fb6e6; --world:#e0a14b;
+    --accent:#9aa7ff; --hot:#f0506e; --good:#54b88a;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:"Inter",-apple-system,Segoe UI,sans-serif;line-height:1.5}
+  .wrap{max-width:1180px;margin:0 auto;padding:22px 22px 60px}
+  header h1{font-size:23px;margin:0 0 3px;font-weight:800;letter-spacing:-.01em}
+  header p{margin:0;color:var(--muted);font-size:13px}
+
+  .filterbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;
+    background:var(--panel);border:1px solid var(--edge);border-radius:10px;
+    padding:12px 14px;margin:16px 0}
+  .filterbar label{font-size:11px;text-transform:uppercase;letter-spacing:.08em;
+    color:var(--muted);font-weight:600;margin-right:2px}
+  select{background:#1e2530;color:var(--ink);border:1px solid var(--line);
+    border-radius:7px;padding:7px 11px;font-size:13px;font-family:inherit}
+  input[type=date]{background:#1e2530;color:var(--ink);border:1px solid var(--line);
+    border-radius:7px;padding:6px 9px;font-size:13px;font-family:inherit;color-scheme:dark}
+  .scopebtn{background:#1e2530;color:var(--muted);border:1px solid var(--line);
+    border-radius:7px;padding:6px 11px;font-size:12px;cursor:pointer;font-family:inherit}
+  .scopebtn:hover{border-color:var(--accent);color:var(--ink)}
+  .pill{font-size:11px;color:var(--muted);margin-left:auto}
+  .pill b{color:var(--ink)}
+
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px}
+  .kpi{background:var(--panel);border:1px solid var(--edge);border-radius:10px;padding:14px 16px}
+  .kpi .k{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
+  .kpi .v{font-size:24px;font-weight:800;margin-top:4px;font-variant-numeric:tabular-nums}
+  .kpi .s{font-size:11px;color:var(--muted);margin-top:2px}
+
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:820px){.grid{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--edge);border-radius:10px;padding:16px 18px}
+  .card h2{font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:var(--accent);
+    margin:0 0 4px;font-weight:700}
+  .card .desc{font-size:12px;color:var(--muted);margin:0 0 14px}
+  .full{grid-column:1/-1}
+
+  /* horizontal bar rows */
+  .bars{display:flex;flex-direction:column;gap:9px}
+  .barrow{display:grid;grid-template-columns:128px 1fr 64px;align-items:center;gap:10px;font-size:12.5px}
+  .barrow .lbl{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .track{background:#222a35;border-radius:4px;height:20px;position:relative;overflow:hidden}
+  .fill{height:100%;border-radius:4px;transition:width .8s cubic-bezier(.2,.7,.2,1)}
+  .val{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
+  .gccbar{background:var(--gcc)} .worldbar{background:var(--world)}
+
+  /* grouped GCC-vs-world */
+  .pairrow{display:grid;grid-template-columns:128px 1fr;gap:10px;align-items:center;
+    font-size:12.5px;margin-bottom:12px}
+  .pairbars{display:flex;flex-direction:column;gap:4px}
+  .mini{display:grid;grid-template-columns:1fr 56px;gap:8px;align-items:center}
+  .minitrack{background:#222a35;border-radius:3px;height:13px;overflow:hidden}
+  .minifill{height:100%;border-radius:3px}
+  .legend{display:flex;gap:16px;font-size:11px;color:var(--muted);margin-bottom:12px}
+  .legend span{display:flex;align-items:center;gap:6px}
+  .dot{width:10px;height:10px;border-radius:2px}
+
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th,td{text-align:right;padding:6px 9px;border-bottom:1px solid var(--line)}
+  th:first-child,td:first-child{text-align:left}
+  th{color:var(--muted);font-weight:600;text-transform:uppercase;font-size:10px;letter-spacing:.06em}
+  td{font-variant-numeric:tabular-nums}
+  .gap-pos{color:var(--hot);font-weight:700}
+  .gap-neg{color:var(--good);font-weight:700}
+  .empty{padding:50px;text-align:center;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Entity &amp; Country Price Dashboard</h1>
+    <p>Hajj 1447 housing contracts, attributed by requester-entity country and filtered by organizer type. SAR per pilgrim / night, incl. VAT.</p>
+  </header>
+
+  <div class="filterbar">
+    <label for="scope-sel">Scope</label>
+    <select id="scope-sel">
+      <option value="gcc">GCC only</option>
+      <option value="world">Whole world</option>
+    </select>
+    <label for="etype" style="margin-left:10px">Organizer type</label>
+    <select id="etype"><option value="__all__">All types</option></select>
+    <label for="city" style="margin-left:10px">City</label>
+    <select id="city">
+      <option value="__all__">All cities</option>
+      <option value="Makkah">Makkah</option>
+      <option value="Madinah">Madinah</option>
+    </select>
+    <label for="d-from" style="margin-left:10px">Active between</label>
+    <input type="date" id="d-from">
+    <span style="color:var(--muted)">→</span>
+    <input type="date" id="d-to">
+    <button id="d-clear" class="scopebtn">clear dates</button>
+    <span class="pill" id="scope">—</span>
+  </div>
+
+  <div id="dash"><div class="empty">Loading entity_dashboard_data.json…</div></div>
+
+  <div class="card full" style="margin-top:16px">
+    <h2>Hotel × time explorer</h2>
+    <p class="desc">Pick a hotel and a window. Every contract live during that window appears with its per-pilgrim-per-night rate (constant, so directly comparable) and a bar showing how much of the contract falls inside your window. The slider requires a minimum overlap.</p>
+    <div class="filterbar" style="margin:0 0 14px">
+      <label for="ex-hotel">Hotel</label>
+      <select id="ex-hotel" style="min-width:240px"></select>
+      <label for="ex-from" style="margin-left:10px">Window</label>
+      <input type="date" id="ex-from">
+      <span style="color:var(--muted)">→</span>
+      <input type="date" id="ex-to">
+      <label for="ex-ov" style="margin-left:10px">Min overlap <b id="ex-ovv">0%</b></label>
+      <input type="range" id="ex-ov" min="0" max="100" value="0" step="5" style="vertical-align:middle">
+    </div>
+    <div id="explorer"></div>
+  </div>
+</div>
+
+<script>
+const C={gcc:"#3fb6e6",world:"#e0a14b"};
+let DATA=null;
+const SOURCES={gcc:"entity_dashboard_data.json",world:"world_dashboard_data.json"};
+const CACHE={};
+
+function loadScope(scope){
+  if(CACHE[scope]){DATA=CACHE[scope];afterLoad();return;}
+  fetch(SOURCES[scope]).then(r=>r.json()).then(d=>{
+    CACHE[scope]=d;DATA=d;afterLoad();
+  }).catch(e=>{
+    document.getElementById("dash").innerHTML=
+      "<div class='empty'>Couldn't load "+SOURCES[scope]+" — run the matching script ("+
+      (scope==="gcc"?"11_entity_analysis.py":"13_world_analysis.py")+") and serve from the same folder.</div>";
+    console.error(e);
+  });
+}
+
+function afterLoad(){
+  const sel=document.getElementById("etype");
+  sel.innerHTML="<option value='__all__'>All types</option>";
+  DATA.entity_types.forEach(t=>{
+    const o=document.createElement("option");o.value=t;o.textContent=t;sel.appendChild(o);
+  });
+  // explorer hotel list: hotels with dated contracts, by contract count
+  const hc={};
+  DATA.points.forEach(p=>{if(p.hotel)hc[p.hotel]=(hc[p.hotel]||0)+1;});
+  const hsel=document.getElementById("ex-hotel");
+  hsel.innerHTML="";
+  Object.entries(hc).sort((a,b)=>b[1]-a[1]).forEach(([h,n])=>{
+    const o=document.createElement("option");o.value=h;o.textContent=h+" ("+n+")";hsel.appendChild(o);
+  });
+  render();
+  renderExplorer();
+}
+
+document.addEventListener("DOMContentLoaded",()=>{
+  document.getElementById("scope-sel").addEventListener("change",e=>loadScope(e.target.value));
+  document.getElementById("etype").addEventListener("change",render);
+  document.getElementById("city").addEventListener("change",render);
+  document.getElementById("d-from").addEventListener("change",render);
+  document.getElementById("d-to").addEventListener("change",render);
+  document.getElementById("d-clear").addEventListener("click",()=>{
+    document.getElementById("d-from").value="";
+    document.getElementById("d-to").value="";render();
+  });
+  ["ex-hotel","ex-from","ex-to"].forEach(id=>
+    document.getElementById(id).addEventListener("change",renderExplorer));
+  document.getElementById("ex-ov").addEventListener("input",e=>{
+    document.getElementById("ex-ovv").textContent=e.target.value+"%";renderExplorer();
+  });
+  loadScope("gcc");
+});
+
+function mean(a){return a.length?a.reduce((s,x)=>s+x,0)/a.length:0;}
+function wmean(rows){const p=rows.reduce((s,r)=>s+r.pilgrims,0);
+  return p?rows.reduce((s,r)=>s+r.cost_pppn*r.pilgrims,0)/p:0;}
+function median(a){if(!a.length)return 0;const s=[...a].sort((x,y)=>x-y);
+  const m=Math.floor(s.length/2);return s.length%2?s[m]:(s[m-1]+s[m])/2;}
+function fmt(n){return Math.round(n).toLocaleString();}
+function dnum(s){return s?Date.parse(s):null;}
+const DAY=86400000;
+
+// overlap (in nights) between a contract and [from,to]; null dates => no window
+function overlapNights(p,from,to){
+  if(!p.start||!p.end)return null;            // can't assess without dates
+  const cs=dnum(p.start),ce=dnum(p.end);
+  const ws=from?dnum(from):cs, we=to?dnum(to):ce;
+  const lo=Math.max(cs,ws),hi=Math.min(ce,we);
+  const ov=Math.round((hi-lo)/DAY);
+  return ov>0?ov:0;
+}
+function overlapPct(p,from,to){
+  if(!p.start||!p.end)return null;
+  const total=Math.max(1,Math.round((dnum(p.end)-dnum(p.start))/DAY));
+  const ov=overlapNights(p,from,to);
+  return ov==null?null:Math.round(100*ov/total);
+}
+
+function currentRows(){
+  const et=document.getElementById("etype").value;
+  const city=document.getElementById("city").value;
+  const from=document.getElementById("d-from").value;
+  const to=document.getElementById("d-to").value;
+  const hasWin=from||to;
+  return DATA.points.filter(p=>{
+    if(et!=="__all__"&&p.entity_type!==et)return false;
+    if(city!=="__all__"&&p.city!==city)return false;
+    if(hasWin){
+      const ov=overlapNights(p,from,to);
+      if(ov==null||ov<=0)return false;        // no dates or no overlap => excluded
+    }
+    return true;
+  });
+}
+
+function renderExplorer(){
+  const box=document.getElementById("explorer");
+  if(!DATA){box.innerHTML="";return;}
+  const hotel=document.getElementById("ex-hotel").value;
+  const from=document.getElementById("ex-from").value;
+  const to=document.getElementById("ex-to").value;
+  const minOv=parseInt(document.getElementById("ex-ov").value)||0;
+  const hasWin=from||to;
+
+  let rows=DATA.points.filter(p=>p.hotel===hotel);
+  // overlap + filter
+  rows=rows.map(p=>({...p,_ov:overlapNights(p,from,to),_ovp:overlapPct(p,from,to)}));
+  let shown=rows.filter(p=>{
+    if(!hasWin)return true;
+    if(p._ov==null)return false;          // undated contract, can't place in window
+    if(p._ov<=0)return false;
+    if(p._ovp<minOv)return false;
+    return true;
+  });
+  const undated=rows.filter(p=>p.start==null||p.end==null).length;
+
+  if(!shown.length){
+    box.innerHTML="<div class='empty'>No contracts at this hotel"+(hasWin?" overlap the window at the chosen minimum.":".")+
+      (undated?(" ("+undated+" undated contract"+(undated>1?"s":"")+" can't be placed on the timeline.)"):"")+"</div>";
+    return;
+  }
+
+  // sort by rate desc so the priciest is on top
+  shown.sort((a,b)=>b.cost_pppn-a.cost_pppn);
+
+  // timeline scale = window if set, else min start..max end across shown
+  const starts=shown.filter(p=>p.start).map(p=>dnum(p.start));
+  const ends=shown.filter(p=>p.end).map(p=>dnum(p.end));
+  const tMin=from?dnum(from):Math.min(...starts);
+  const tMax=to?dnum(to):Math.max(...ends);
+  const span=(tMax-tMin)||DAY;
+  const x=t=>100*(t-tMin)/span;
+
+  const rates=shown.map(p=>p.cost_pppn);
+  const rMin=Math.min(...rates),rMax=Math.max(...rates);
+
+  let html="<div style='font-size:12px;color:var(--muted);margin-bottom:10px'>"+
+    shown.length+" contract(s) at <b style='color:var(--ink)'>"+hotel+"</b>"+
+    (hasWin?(" overlapping "+(from||"…")+" → "+(to||"…")+" at ≥"+minOv+"% overlap"):"")+
+    " · rate range "+fmt(rMin)+"–"+fmt(rMax)+" SAR/pilgrim·night"+
+    (undated?(" · "+undated+" undated hidden"):"")+"</div>";
+
+  // window reference band
+  html+="<div style='position:relative'>";
+  shown.forEach(p=>{
+    const col=p.bloc==="GCC"?C.gcc:C.world;
+    const cs=p.start?dnum(p.start):tMin, ce=p.end?dnum(p.end):tMax;
+    const left=Math.max(0,x(cs)), right=Math.min(100,x(ce));
+    const w=Math.max(1.5,right-left);
+    // portion inside window (when window set)
+    let insideStyle="";
+    if(hasWin){
+      const ws=from?dnum(from):tMin, we=to?dnum(to):tMax;
+      const il=Math.max(left,x(Math.max(cs,ws))), ir=Math.min(right,x(Math.min(ce,we)));
+      insideStyle=`<div style="position:absolute;left:${il}%;width:${Math.max(0,ir-il)}%;top:0;bottom:0;background:${col};border-radius:3px"></div>`;
+    }
+    // rate-driven intensity for the rail label
+    const hot=rMax>rMin && p.cost_pppn>=rMin+(rMax-rMin)*0.66;
+    html+=`<div style="display:grid;grid-template-columns:150px 1fr 150px;gap:10px;align-items:center;margin:6px 0;font-size:12.5px">
+      <div style="text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+        ${p.country} <span style="font-size:9.5px;padding:1px 5px;border-radius:2px;background:${p.bloc==='GCC'?'#1d3a5c':'#4a3a1c'};color:${col}">${p.bloc}</span></div>
+      <div style="position:relative;height:22px;background:#222a35;border-radius:3px;overflow:hidden">
+        <div style="position:absolute;left:${left}%;width:${w}%;top:0;bottom:0;background:${col};opacity:${hasWin?0.28:0.85};border-radius:3px"></div>
+        ${insideStyle}
+      </div>
+      <div style="font-variant-numeric:tabular-nums;font-weight:${hot?'800':'600'};color:${hot?C.world:'var(--ink)'}">
+        ${fmt(p.cost_pppn)} SAR${p._ov!=null&&hasWin?` <span style="color:var(--muted);font-weight:400">· ${p._ov}n in (${p._ovp}%)</span>`:""}</div>
+    </div>`;
+  });
+  html+="</div>";
+
+  // axis labels
+  const d=t=>new Date(t).toISOString().slice(0,10);
+  html+=`<div style="display:grid;grid-template-columns:150px 1fr 150px;gap:10px;font-size:10.5px;color:var(--muted);margin-top:4px">
+    <span></span><span style="display:flex;justify-content:space-between"><span>${d(tMin)}</span><span>${d(tMax)}</span></span><span></span></div>`;
+
+  box.innerHTML=html;
+}
+
+function render(){
+  const rows=currentRows();
+  const dash=document.getElementById("dash");
+  const et=document.getElementById("etype").value;
+  document.getElementById("scope").innerHTML=
+    "<b>"+rows.length+"</b> contracts · "+
+    (et==="__all__"?"all organizer types":et);
+
+  if(!rows.length){dash.innerHTML="<div class='empty'>No contracts match this filter.</div>";return;}
+
+  const gcc=rows.filter(r=>r.bloc==="GCC");
+  const world=rows.filter(r=>r.bloc==="World");
+  const isWorld=document.getElementById("scope-sel").value==="world";
+  const withinRows=isWorld?rows:gcc;
+
+  // ---- KPIs ----
+  const gccW=wmean(gcc), worldW=wmean(world);
+  const gap=gccW-worldW;
+  // within-GCC: per-country weighted means, then spread
+  const byC={};
+  withinRows.forEach(r=>{(byC[r.country]=byC[r.country]||[]).push(r);});
+  const cMeans=Object.entries(byC).map(([c,rs])=>({country:c,w:wmean(rs),n:rs.length,
+    pil:rs.reduce((s,x)=>s+x.pilgrims,0)})).sort((a,b)=>b.w-a.w);
+  const within=cMeans.length>1?(cMeans[0].w-cMeans[cMeans.length-1].w):0;
+
+  let html="";
+  html+="<div class='kpis'>"+
+    kpi(isWorld?"All-countries weighted avg":"GCC weighted avg",fmt(isWorld?wmean(rows):gccW),"SAR / pilgrim·night")+
+    kpi("World (non-GCC) weighted avg",fmt(worldW),"SAR / pilgrim·night")+
+    kpi("GCC − World gap",(gap>=0?"+":"")+fmt(gap),(gccW/worldW-1>=0?"+":"")+((gccW/worldW-1)*100).toFixed(0)+"% vs world")+
+    kpi(isWorld?"Country spread":"Within-GCC spread",fmt(within),"top vs bottom country")+
+    kpi("Contracts",fmt(rows.length),gcc.length+" GCC · "+world.length+" world")+
+    "</div>";
+
+  html+="<div class='grid'>";
+
+  // ---- country ranking ----
+  const maxC=Math.max(...cMeans.map(c=>c.w),1);
+  html+="<div class='card'><h2>"+(isWorld?"Across all countries":"Within the GCC")+"</h2>"+
+    "<p class='desc'>Pilgrim-weighted avg nightly rate by requester country"+
+    (isWorld?" (top 15 shown)":"")+". The spread between top and bottom is the discrepancy.</p><div class='bars'>";
+  cMeans.slice(0,isWorld?15:cMeans.length).forEach(c=>{
+    html+="<div class='barrow'><span class='lbl'>"+c.country+"</span>"+
+      "<div class='track'><div class='fill gccbar' style='width:"+(100*c.w/maxC)+"%'></div></div>"+
+      "<span class='val'>"+fmt(c.w)+"</span></div>";
+  });
+  html+="</div></div>";
+
+  // ---- GCC vs World per country pairing ----
+  html+="<div class='card'><h2>GCC vs Rest of World</h2>"+
+    "<p class='desc'>Each GCC country's weighted rate against the world average for the same filter.</p>"+
+    "<div class='legend'><span><span class='dot' style='background:"+C.gcc+"'></span>GCC country</span>"+
+    "<span><span class='dot' style='background:"+C.world+"'></span>World avg</span></div>";
+  const allMax=Math.max(maxC,worldW,1);
+  cMeans.forEach(c=>{
+    html+="<div class='pairrow'><span class='lbl'>"+c.country+"</span><div class='pairbars'>"+
+      "<div class='mini'><div class='minitrack'><div class='minifill' style='width:"+(100*c.w/allMax)+"%;background:"+C.gcc+"'></div></div><span class='val'>"+fmt(c.w)+"</span></div>"+
+      "<div class='mini'><div class='minitrack'><div class='minifill' style='width:"+(100*worldW/allMax)+"%;background:"+C.world+"'></div></div><span class='val'>"+fmt(worldW)+"</span></div>"+
+      "</div></div>";
+  });
+  html+="</div>";
+
+  // ---- entity-type comparison (uses full population for the scope) ----
+  html+="<div class='card full'><h2>By organizer type — "+(isWorld?"all countries":"GCC contracts")+"</h2>"+
+    "<p class='desc'>Weighted avg nightly rate per organizer type. Higher-priced types are candidates for investigation. (This panel ignores the type filter so all types stay comparable.)</p>";
+  const popCity=document.getElementById("city").value;
+  const typePop=DATA.points.filter(p=>
+    (isWorld||p.bloc==="GCC") &&
+    (popCity==="__all__"||p.city===popCity));
+  const byT={};
+  typePop.forEach(r=>{(byT[r.entity_type]=byT[r.entity_type]||[]).push(r);});
+  const tMeans=Object.entries(byT).map(([t,rs])=>({type:t,w:wmean(rs),n:rs.length,
+    pil:rs.reduce((s,x)=>s+x.pilgrims,0)})).sort((a,b)=>b.w-a.w);
+  const maxT=Math.max(...tMeans.map(t=>t.w),1);
+  html+="<div class='bars'>";
+  tMeans.forEach(t=>{
+    const hot=t.w>=maxT*0.92;
+    html+="<div class='barrow'><span class='lbl'>"+t.type+"</span>"+
+      "<div class='track'><div class='fill' style='width:"+(100*t.w/maxT)+"%;background:"+(hot?"var(--hot)":"var(--accent)")+"'></div></div>"+
+      "<span class='val'>"+fmt(t.w)+"</span></div>";
+  });
+  html+="</div></div>";
+
+  // ---- per-country x per-type table ----
+  html+="<div class='card full'><h2>Country × organizer type — weighted avg</h2>"+
+    "<p class='desc'>Cross-tab of weighted nightly rate"+(isWorld?" (top 15 countries by pilgrims)":"")+". Empty = no contracts of that type for that country.</p>"+
+    buildCrossTab(typePop,isWorld)+"</div>";
+
+  html+="</div>";
+  dash.innerHTML=html;
+
+  // animate fills
+  requestAnimationFrame(()=>{
+    document.querySelectorAll(".fill,.minifill").forEach(f=>{
+      const w=f.style.width; f.style.width="0%";
+      requestAnimationFrame(()=>{f.style.width=w;});
+    });
+  });
+}
+
+function kpi(k,v,s){return "<div class='kpi'><div class='k'>"+k+"</div><div class='v'>"+v+"</div><div class='s'>"+s+"</div></div>";}
+
+function buildCrossTab(pop,isWorld){
+  const types=[...new Set(pop.map(r=>r.entity_type))].sort();
+  let countries;
+  if(isWorld){
+    // top 15 countries by pilgrims
+    const byPil={};
+    pop.forEach(r=>{byPil[r.country]=(byPil[r.country]||0)+r.pilgrims;});
+    countries=Object.entries(byPil).sort((a,b)=>b[1]-a[1]).slice(0,15).map(x=>x[0]);
+  }else{
+    countries=DATA.gcc.filter(c=>pop.some(r=>r.country===c));
+  }
+  let h="<table><thead><tr><th>Country</th>";
+  types.forEach(t=>h+="<th>"+t+"</th>");
+  h+="<th>All</th></tr></thead><tbody>";
+  countries.forEach(c=>{
+    h+="<tr><td>"+c+"</td>";
+    const crows=pop.filter(r=>r.country===c);
+    types.forEach(t=>{
+      const rs=crows.filter(r=>r.entity_type===t);
+      h+="<td>"+(rs.length?fmt(wmean(rs)):"—")+"</td>";
+    });
+    h+="<td><b>"+fmt(wmean(crows))+"</b></td></tr>";
+  });
+  h+="<tr><td><b>All</b></td>";
+  types.forEach(t=>{
+    const rs=pop.filter(r=>r.entity_type===t);
+    h+="<td><b>"+(rs.length?fmt(wmean(rs)):"—")+"</b></td>";
+  });
+  h+="<td><b>"+fmt(wmean(pop))+"</b></td></tr>";
+  h+="</tbody></table>";
+  return h;
+}
+</script>
+</body>
+</html>
