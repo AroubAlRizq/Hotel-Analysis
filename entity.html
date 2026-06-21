@@ -6,9 +6,9 @@
 <title>Hajj 1447 — Entity & Country Price Dashboard</title>
 <style>
   :root{
-    --bg:#0e1217; --panel:#171c24; --edge:#252c37; --ink:#e6edf3;
-    --muted:#8b97a6; --line:#2a3340; --gcc:#3fb6e6; --world:#e0a14b;
-    --accent:#9aa7ff; --hot:#f0506e; --good:#54b88a;
+    --bg:#000000; --panel:#0d0a05; --edge:#2a2117; --ink:#f2e8d8;
+    --muted:#9a876a; --line:#2a2117; --gcc:#e6ab71; --world:#7a5f33;
+    --accent:#c8a050; --hot:#e6ab71; --good:#7a5f33;
   }
   *{box-sizing:border-box}
   html,body{margin:0;background:var(--bg);color:var(--ink);
@@ -125,7 +125,7 @@
 </div>
 
 <script>
-const C={gcc:"#3fb6e6",world:"#e0a14b"};
+const C={gcc:"#e6ab71",world:"#7a5f33"};
 let DATA=null;
 const SOURCES={gcc:"entity_dashboard_data.json",world:"world_dashboard_data.json"};
 const CACHE={};
@@ -304,6 +304,48 @@ function renderExplorer(){
   box.innerHTML=html;
 }
 
+function starNum(s){const m=String(s).match(/\d+/);return m?parseInt(m[0]):null;}
+function categoryPanel(rows,isWorld){
+  // group current (filtered) rows by star number
+  const byS={};
+  rows.forEach(p=>{const n=starNum(p.star);if(n!=null)(byS[n]=byS[n]||[]).push(p);});
+  const stars=Object.keys(byS).map(Number).sort((a,b)=>a-b);
+  if(!stars.length) return "";
+  const med=arr=>{const s=[...arr].sort((x,y)=>x-y);const m=Math.floor(s.length/2);
+    return s.length%2?s[m]:(s[m-1]+s[m])/2;};
+  const stats=stars.map(n=>{
+    const cs=byS[n].map(p=>p.cost_pppn);
+    const m=med(cs);
+    return {n,label:n+"★",median:m,min:Math.min(...cs),max:Math.max(...cs),
+      perStar:m/n,nC:byS[n].length};
+  });
+  const gMax=Math.max(...stats.map(s=>s.max));
+  // bar rows with whisker (min-max) overlaid
+  let bars="";
+  stats.forEach(s=>{
+    const medX=100*s.median/gMax, minX=100*s.min/gMax, maxX=100*s.max/gMax;
+    bars+=`<div style="display:grid;grid-template-columns:48px 1fr 150px;gap:10px;align-items:center;margin:8px 0;font-size:12.5px">
+      <span style="font-weight:700">${s.label}</span>
+      <div style="position:relative;height:24px;background:#1a140c;border-radius:4px;overflow:hidden">
+        <div style="position:absolute;left:0;top:0;bottom:0;width:${medX}%;background:var(--gcc);opacity:.85;border-radius:4px"></div>
+        <div style="position:absolute;left:${minX}%;width:${Math.max(1,maxX-minX)}%;top:50%;height:2px;background:var(--ink);transform:translateY(-50%)"></div>
+        <div style="position:absolute;left:${minX}%;top:30%;height:40%;width:2px;background:var(--ink)"></div>
+        <div style="position:absolute;left:${maxX}%;top:30%;height:40%;width:2px;background:var(--ink)"></div>
+      </div>
+      <span style="font-variant-numeric:tabular-nums"><b>${fmt(s.median)}</b> SAR · /★ ${fmt(s.perStar)} · ${s.nC}c</span>
+    </div>`;
+  });
+  // flag: any low star whose max exceeds a higher star's median
+  let flag="";
+  for(const s of stats){
+    const higher=stats.find(h=>h.n>s.n && s.max>=h.median);
+    if(higher){flag=`<div class="takeaway" style="margin-top:10px"><b>${s.label}</b> contracts reach ${fmt(s.max)} SAR — into ${higher.label} territory (median ${fmt(higher.median)}). The rating doesn't explain the top of that range.</div>`;break;}
+  }
+  return `<div class="card full"><h2>Hotel-category discrepancy ${isWorld?"— all countries":"— GCC"}</h2>`+
+    `<p class="desc">Median nightly rate per star category (bar) with the min–max range (whisker). Per-star value and contract count at right. Respects the filters above. Where a low-star whisker reaches into higher-star territory, the rating isn't the explanation.</p>`+
+    bars+flag+`</div>`;
+}
+
 function render(){
   const rows=currentRows();
   const dash=document.getElementById("dash");
@@ -391,6 +433,9 @@ function render(){
   html+="<div class='card full'><h2>Country × organizer type — weighted avg</h2>"+
     "<p class='desc'>Cross-tab of weighted nightly rate"+(isWorld?" (top 15 countries by pilgrims)":"")+". Empty = no contracts of that type for that country.</p>"+
     buildCrossTab(typePop,isWorld)+"</div>";
+
+  // ---- hotel-category discrepancy ----
+  html+=categoryPanel(rows,isWorld);
 
   html+="</div>";
   dash.innerHTML=html;
