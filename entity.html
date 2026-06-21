@@ -102,6 +102,10 @@
     <span style="color:var(--muted)">→</span>
     <input type="date" id="d-to">
     <button id="d-clear" class="scopebtn">clear dates</button>
+    <label style="margin-left:10px;display:flex;align-items:center;gap:6px;cursor:pointer">
+      <input type="checkbox" id="min-pil" checked>
+      <span style="font-weight:600;color:var(--ink);text-transform:none;letter-spacing:0">exclude &lt;30 pilgrims</span>
+    </label>
     <span class="pill" id="scope">—</span>
   </div>
 
@@ -166,6 +170,7 @@ document.addEventListener("DOMContentLoaded",()=>{
   document.getElementById("city").addEventListener("change",render);
   document.getElementById("d-from").addEventListener("change",render);
   document.getElementById("d-to").addEventListener("change",render);
+  document.getElementById("min-pil").addEventListener("change",render);
   document.getElementById("d-clear").addEventListener("click",()=>{
     document.getElementById("d-from").value="";
     document.getElementById("d-to").value="";render();
@@ -208,10 +213,12 @@ function currentRows(){
   const city=document.getElementById("city").value;
   const from=document.getElementById("d-from").value;
   const to=document.getElementById("d-to").value;
+  const minPil=document.getElementById("min-pil").checked;
   const hasWin=from||to;
   return DATA.points.filter(p=>{
     if(et!=="__all__"&&p.entity_type!==et)return false;
     if(city!=="__all__"&&p.city!==city)return false;
+    if(minPil&&p.pilgrims<30)return false;
     if(hasWin){
       const ov=overlapNights(p,from,to);
       if(ov==null||ov<=0)return false;        // no dates or no overlap => excluded
@@ -412,9 +419,11 @@ function render(){
   html+="<div class='card full'><h2>By organizer type — "+(isWorld?"all countries":"GCC contracts")+"</h2>"+
     "<p class='desc'>Weighted avg nightly rate per organizer type. Higher-priced types are candidates for investigation. (This panel ignores the type filter so all types stay comparable.)</p>";
   const popCity=document.getElementById("city").value;
+  const popMinPil=document.getElementById("min-pil").checked;
   const typePop=DATA.points.filter(p=>
     (isWorld||p.bloc==="GCC") &&
-    (popCity==="__all__"||p.city===popCity));
+    (popCity==="__all__"||p.city===popCity) &&
+    (!popMinPil||p.pilgrims>=30));
   const byT={};
   typePop.forEach(r=>{(byT[r.entity_type]=byT[r.entity_type]||[]).push(r);});
   const tMeans=Object.entries(byT).map(([t,rs])=>({type:t,w:wmean(rs),n:rs.length,
