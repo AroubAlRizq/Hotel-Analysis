@@ -170,7 +170,7 @@ document.addEventListener("DOMContentLoaded",()=>{
   document.getElementById("city").addEventListener("change",render);
   document.getElementById("d-from").addEventListener("change",render);
   document.getElementById("d-to").addEventListener("change",render);
-  document.getElementById("min-pil").addEventListener("change",render);
+  document.getElementById("min-pil").addEventListener("change",()=>{render();renderExplorer();});
   document.getElementById("d-clear").addEventListener("click",()=>{
     document.getElementById("d-from").value="";
     document.getElementById("d-to").value="";render();
@@ -237,6 +237,10 @@ function renderExplorer(){
   const hasWin=from||to;
 
   let rows=DATA.points.filter(p=>p.hotel===hotel);
+  // respect the global "exclude <30 pilgrims" toggle
+  if(document.getElementById("min-pil").checked){
+    rows=rows.filter(p=>p.pilgrims>=30);
+  }
   // overlap + filter
   rows=rows.map(p=>({...p,_ov:overlapNights(p,from,to),_ovp:overlapPct(p,from,to)}));
   let shown=rows.filter(p=>{
