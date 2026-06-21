@@ -302,7 +302,8 @@ function renderExplorer(){
         ${insideStyle}
       </div>
       <div style="font-variant-numeric:tabular-nums;font-weight:${hot?'800':'600'};color:${hot?C.world:'var(--ink)'}">
-        ${fmt(p.cost_pppn)} SAR${p._ov!=null&&hasWin?` <span style="color:var(--muted);font-weight:400">· ${p._ov}n in (${p._ovp}%)</span>`:""}</div>
+        ${fmt(p.cost_pppn)} SAR${p._ov!=null&&hasWin?` <span style="color:var(--muted);font-weight:400">· ${p._ov}n in (${p._ovp}%)</span>`:""}
+        <div style="font-size:10.5px;color:var(--muted);font-weight:400">${fmt(p.pilgrims)} pilgrims</div></div>
     </div>`;
   });
   html+="</div>";
